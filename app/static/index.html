@@ -43,7 +43,7 @@
 
   <script>
     const el = (id) => document.getElementById(id);
-    const MAX_TEXT_LENGTH = 5000;
+    let MAX_TEXT_LENGTH = 50000;
 
     function updateCounter() {
       const length = el("text").value.length;
@@ -62,6 +62,8 @@
       for (const name of engines.engines) {
         el("engine").add(new Option(name, name));
       }
+      MAX_TEXT_LENGTH = engines.max_text_length;
+      updateCounter();
       el("device").textContent = `Çalışma cihazı: ${engines.device.toUpperCase()}`;
     }
 

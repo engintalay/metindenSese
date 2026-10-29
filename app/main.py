@@ -1,16 +1,14 @@
 import uuid
 from datetime import datetime
-from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app.config import HOST, LANGUAGES, OUTPUTS_DIR, PORT, ROOT_DIR
+from app.audio import join_audio, split_text, write_wav
+from app.config import HOST, LANGUAGES, MAX_TEXT_LENGTH, OUTPUTS_DIR, PORT, ROOT_DIR
 from app.engines import PiperEngine, XTTSEngine, detect_device
-
-MAX_TEXT_LENGTH = 5000
 
 app = FastAPI(title="Metinden Sese")
 app.mount("/static", StaticFiles(directory=ROOT_DIR / "app" / "static"), name="static")
@@ -40,7 +38,11 @@ def list_languages():
 
 @app.get("/api/engines")
 def list_engines():
-    return {"device": DEVICE, "engines": list(ENGINES.keys())}
+    return {
+        "device": DEVICE,
+        "engines": list(ENGINES.keys()),
+        "max_text_length": MAX_TEXT_LENGTH,
+    }
 
 
 @app.post("/api/speak")
@@ -51,14 +53,24 @@ def speak(req: SpeakRequest):
     if not engine.supports(req.lang):
         raise HTTPException(status_code=400, detail="Desteklenmeyen dil")
 
+    chunks = split_text(req.text)
+    if not chunks:
+        raise HTTPException(status_code=400, detail="Metinde seslendirilecek içerik yok")
+
+    try:
+        parts = []
+        sample_rate = None
+        for chunk in chunks:
+            samples, sample_rate = engine.synthesize(chunk, req.lang)
+            parts.append(samples)
+        audio = join_audio(parts, sample_rate)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Ses üretilemedi: {exc}")
+
     OUTPUTS_DIR.mkdir(exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     filename = f"{stamp}-{req.engine}-{req.lang}-{uuid.uuid4().hex[:6]}.wav"
-    out_path = OUTPUTS_DIR / filename
-    try:
-        engine.synthesize(req.text, req.lang, out_path)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Ses üretilemedi: {exc}")
+    out_path = write_wav(OUTPUTS_DIR / filename, audio, sample_rate)
     return FileResponse(out_path, media_type="audio/wav", filename=filename)
 
 

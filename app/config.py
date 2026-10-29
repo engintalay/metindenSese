@@ -7,6 +7,10 @@ OUTPUTS_DIR = ROOT_DIR / "outputs"
 HOST = "0.0.0.0"
 PORT = 10001
 
+MAX_TEXT_LENGTH = 50000
+CHUNK_CHARS = 250
+PAUSE_SECONDS = 0.3
+
 # "auto": NVIDIA (CUDA) varsa onu kullan, yoksa CPU. Elle "cpu" veya "cuda" yazılabilir.
 DEVICE = "auto"
 

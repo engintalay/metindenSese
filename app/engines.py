@@ -1,8 +1,8 @@
 import shutil
 import subprocess
-import wave
 from pathlib import Path
 
+import numpy as np
 from piper import PiperVoice
 
 from app.config import DEVICE, LANGUAGES, MODELS_DIR, XTTS_MODEL_DIR, XTTS_SPEAKER
@@ -45,11 +45,11 @@ class PiperEngine:
             )
         return self._voices[lang]
 
-    def synthesize(self, text: str, lang: str, out_path: Path) -> Path:
+    def synthesize(self, text: str, lang: str) -> tuple[np.ndarray, int]:
         voice = self._voice(lang)
-        with wave.open(str(out_path), "wb") as wav_file:
-            voice.synthesize_wav(text, wav_file)
-        return out_path
+        chunks = [chunk.audio_int16_array for chunk in voice.synthesize(text)]
+        samples = np.concatenate(chunks).astype(np.float32) / 32768.0
+        return samples, voice.config.sample_rate
 
 
 class XTTSEngine:
@@ -70,11 +70,11 @@ class XTTSEngine:
             self._tts.to(self.device)
         return self._tts
 
-    def synthesize(self, text: str, lang: str, out_path: Path) -> Path:
-        self._model().tts_to_file(
+    def synthesize(self, text: str, lang: str) -> tuple[np.ndarray, int]:
+        tts = self._model()
+        wav = tts.tts(
             text=text,
             speaker=XTTS_SPEAKER,
             language=LANGUAGES[lang]["xtts"],
-            file_path=str(out_path),
         )
-        return out_path
+        return np.asarray(wav, dtype=np.float32), tts.synthesizer.output_sample_rate
