@@ -6,6 +6,7 @@
 - Commit öncesi `git status` ile yalnızca ilgili dosyaların eklendiği kontrol edilir.
 - `models/`, `outputs/`, sanal ortam (`.venv/`) ve `__pycache__/` git'e eklenmez (`.gitignore`).
 - Doğrudan `main` dalına push yapılır (bireysel proje). Gerekirse dal kuralı sonradan değiştirilebilir.
+- Uzak depo (remote) henüz eklenmediyse commit'ler yerelde atılır ve push ertelenir. Remote eklendiğinde `git push -u origin main` ile bekleyen tüm commit'ler gönderilir.
 - Geri alınamaz işlemler (`push --force`, `reset --hard`) kullanıcı onayı olmadan yapılmaz.
 
 ## Kod
