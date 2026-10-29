@@ -9,38 +9,32 @@ Metni sese çeviren, yerelde çalışan ücretsiz bir web uygulaması. Bireysel 
 - **Çıktı:** WAV (tarayıcıda oynatma ve indirme)
 - **Port:** 10001, ağdaki diğer makinelerden de erişilebilir
 
-## Kurulum
-
-Python 3.11 gerekir. Aşağıdaki adımlar [uv](https://docs.astral.sh/uv/) ile örneklenmiştir.
+## Hızlı başlangıç
 
 ```bash
-uv python install 3.11
-uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python -r requirements.txt
+scripts/install.sh          # Python 3.11 ortamı ve bağımlılıklar
+scripts/download_models.sh  # Piper ve XTTS v2 modelleri
+scripts/run.sh              # Sunucuyu başlatır
 ```
 
-### Ses modelleri
+`install.sh` [uv](https://docs.astral.sh/uv/) varsa onu, yoksa sistemdeki `python3.11`'i kullanır. Betikler tekrar çalıştırılabilir, var olan dosyaları atlar.
 
-Piper modellerini [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices) deposundan `models/` klasörüne indirin:
+## Ses modelleri
 
-- `tr/tr_TR/dfki/medium/tr_TR-dfki-medium.onnx` (+ `.onnx.json`)
-- `de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx` (+ `.onnx.json`)
-- `es/es_ES/davefx/medium/es_ES-davefx-medium.onnx` (+ `.onnx.json`)
-- `en/en_US/lessac/medium/en_US-lessac-medium.onnx` (+ `.onnx.json`)
+`scripts/download_models.sh` aşağıdakileri `models/` altına indirir:
 
-XTTS v2 modelini `models/xtts_v2/` klasörüne indirin:
-
-```bash
-COQUI_TOS_AGREED=1 .venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='coqui/XTTS-v2', local_dir='models/xtts_v2', allow_patterns=['*.json','*.pth','*.pth.tar','*.wav'])"
-```
+- Piper: `tr_TR-dfki-medium`, `de_DE-thorsten-medium`, `es_ES-davefx-medium`, `en_US-lessac-medium` (`.onnx` + `.onnx.json`)
+- XTTS v2: `models/xtts_v2/`
 
 XTTS v2 lisansı (Coqui Public Model License) ticari olmayan kullanım içindir.
 
 ## Çalıştırma
 
 ```bash
-.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 10001
+scripts/run.sh
 ```
+
+Port ve adres ortam değişkeniyle değiştirilebilir: `PORT=10002 HOST=127.0.0.1 scripts/run.sh`. Varsayılan `0.0.0.0:10001`.
 
 - Bu makineden: `http://localhost:10001`
 - Ağdaki diğer makinelerden: `http://<bu-makinenin-IP>:10001`
