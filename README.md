@@ -57,12 +57,17 @@ Not: AMD APU (Vulkan) desteklenmiyor. Bu tür donanımda CPU kullanılır.
 | GET | `/` | Web arayüzü |
 | GET | `/api/languages` | Desteklenen diller |
 | GET | `/api/engines` | Motorlar ve çalışma cihazı |
-| POST | `/api/speak` | `{"text": "...", "lang": "tr", "engine": "piper"}` → WAV |
+| POST | `/api/speak` | `{"text": "...", "lang": "tr", "engine": "piper"}` → WAV (senkron) |
+| POST | `/api/jobs` | Aynı gövde. Arka planda üretim başlatır, `id` döner |
+| GET | `/api/jobs/{id}` | Durum: `queued`, `loading`, `running`, `done`, `error`. İlerleme (`done`/`total`), geçen süre ve tahmini kalan süre |
+| GET | `/api/jobs/{id}/audio` | Tamamlanan WAV dosyası |
 
 Üretilen dosyalar `outputs/` klasörüne kaydedilir.
 
 ## Notlar
 
 - XTTS v2 CPU'da uzun metinlerde birkaç dakika sürebilir. İlk istekte model yüklenir.
-- Metin en fazla 5000 karakter olabilir.
+- Metin en fazla 50 000 karakter olabilir (`app/config.py` içinde `MAX_TEXT_LENGTH`). Uzun metinler cümle bazlı parçalara bölünür, parça parça üretilip tek WAV'da birleştirilir.
+- Arayüzde ilerleme; parça sayısı, geçen süre ve tahmini kalan süre gösterilir.
+- Üretim tek bir işçi üzerinden sıralı yapılır, aynı anda birden fazla iş bekleyebilir.
 - Modeller ve çıktılar git'e eklenmez.

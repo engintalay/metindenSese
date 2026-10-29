@@ -1,14 +1,12 @@
-import uuid
-from datetime import datetime
-
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app.audio import join_audio, split_text, write_wav
-from app.config import HOST, LANGUAGES, MAX_TEXT_LENGTH, OUTPUTS_DIR, PORT, ROOT_DIR
+from app.audio import split_text
+from app.config import HOST, LANGUAGES, MAX_TEXT_LENGTH, PORT, ROOT_DIR
 from app.engines import PiperEngine, XTTSEngine, detect_device
+from app.jobs import create_job, get_job, render
 
 app = FastAPI(title="Metinden Sese")
 app.mount("/static", StaticFiles(directory=ROOT_DIR / "app" / "static"), name="static")
@@ -24,6 +22,15 @@ class SpeakRequest(BaseModel):
     text: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
     lang: str
     engine: str = "piper"
+
+
+def _validate(req: SpeakRequest):
+    if req.engine not in ENGINES:
+        raise HTTPException(status_code=400, detail="Bilinmeyen motor")
+    if req.lang not in LANGUAGES:
+        raise HTTPException(status_code=400, detail="Desteklenmeyen dil")
+    if not split_text(req.text):
+        raise HTTPException(status_code=400, detail="Metinde seslendirilecek içerik yok")
 
 
 @app.get("/")
@@ -47,31 +54,38 @@ def list_engines():
 
 @app.post("/api/speak")
 def speak(req: SpeakRequest):
-    if req.engine not in ENGINES:
-        raise HTTPException(status_code=400, detail="Bilinmeyen motor")
+    _validate(req)
     engine = ENGINES[req.engine]
-    if not engine.supports(req.lang):
-        raise HTTPException(status_code=400, detail="Desteklenmeyen dil")
-
-    chunks = split_text(req.text)
-    if not chunks:
-        raise HTTPException(status_code=400, detail="Metinde seslendirilecek içerik yok")
-
     try:
-        parts = []
-        sample_rate = None
-        for chunk in chunks:
-            samples, sample_rate = engine.synthesize(chunk, req.lang)
-            parts.append(samples)
-        audio = join_audio(parts, sample_rate)
+        out_path = render(engine, req.engine, req.lang, split_text(req.text))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Ses üretilemedi: {exc}")
+    return FileResponse(out_path, media_type="audio/wav", filename=out_path.name)
 
-    OUTPUTS_DIR.mkdir(exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    filename = f"{stamp}-{req.engine}-{req.lang}-{uuid.uuid4().hex[:6]}.wav"
-    out_path = write_wav(OUTPUTS_DIR / filename, audio, sample_rate)
-    return FileResponse(out_path, media_type="audio/wav", filename=filename)
+
+@app.post("/api/jobs", status_code=202)
+def start_job(req: SpeakRequest):
+    _validate(req)
+    job = create_job(ENGINES[req.engine], req.engine, req.lang, req.text)
+    return job.to_dict()
+
+
+@app.get("/api/jobs/{job_id}")
+def job_status(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="İş bulunamadı")
+    return job.to_dict()
+
+
+@app.get("/api/jobs/{job_id}/audio")
+def job_audio(job_id: str):
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="İş bulunamadı")
+    if job.status != "done" or job.output is None:
+        raise HTTPException(status_code=409, detail="Ses henüz hazır değil")
+    return FileResponse(job.output, media_type="audio/wav", filename=job.output.name)
 
 
 if __name__ == "__main__":

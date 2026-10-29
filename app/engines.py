@@ -45,6 +45,9 @@ class PiperEngine:
             )
         return self._voices[lang]
 
+    def load(self, lang: str) -> None:
+        self._voice(lang)
+
     def synthesize(self, text: str, lang: str) -> tuple[np.ndarray, int]:
         voice = self._voice(lang)
         chunks = [chunk.audio_int16_array for chunk in voice.synthesize(text)]
@@ -69,6 +72,9 @@ class XTTSEngine:
             self._tts = TTS(model_path=str(XTTS_MODEL_DIR), config_path=str(XTTS_MODEL_DIR / "config.json"))
             self._tts.to(self.device)
         return self._tts
+
+    def load(self, lang: str) -> None:
+        self._model()
 
     def synthesize(self, text: str, lang: str) -> tuple[np.ndarray, int]:
         tts = self._model()
