@@ -62,6 +62,18 @@ Not: AMD APU (Vulkan) desteklenmiyor. Bu tür donanımda CPU kullanılır.
 | GET | `/api/jobs/{id}` | Durum: `queued`, `loading`, `running`, `done`, `error`. İlerleme (`done`/`total`), geçen süre ve tahmini kalan süre |
 | GET | `/api/jobs/{id}/audio` | Tamamlanan WAV dosyası |
 
+İstek gövdesindeki `settings` alanı isteğe bağlıdır. Verilmeyen ayarlar varsayılanla çalışır:
+
+| Ayar | Aralık | Varsayılan | Motor | Açıklama |
+|---|---|---|---|---|
+| `speed` | 0.5 – 1.5 | 1.0 | İkisi de | Konuşma hızı |
+| `noise_scale` | 0 – 1.5 | 0.667 | Piper | Ses doğallığı çeşitliliği |
+| `noise_w_scale` | 0 – 1.5 | 0.8 | Piper | Konuşma ritmi çeşitliliği |
+| `temperature` | 0.1 – 1.5 | 0.75 | XTTS | Yaratıcılık |
+| `top_p` | 0.1 – 1.0 | 0.85 | XTTS | Örnekleme genişliği |
+
+Örnek: `{"text": "...", "lang": "tr", "engine": "piper", "settings": {"speed": 1.2}}`
+
 Üretilen dosyalar `outputs/` klasörüne kaydedilir.
 
 ## Notlar

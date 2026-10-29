@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.audio import split_text
-from app.config import HOST, LANGUAGES, MAX_TEXT_LENGTH, PORT, ROOT_DIR
+from app.config import DEFAULT_SETTINGS, HOST, LANGUAGES, MAX_TEXT_LENGTH, PORT, ROOT_DIR, SETTING_LIMITS
 from app.engines import PiperEngine, XTTSEngine, detect_device
 from app.jobs import create_job, get_job, render
 
@@ -22,15 +22,26 @@ class SpeakRequest(BaseModel):
     text: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
     lang: str
     engine: str = "piper"
+    settings: dict[str, float] = Field(default_factory=dict)
 
 
-def _validate(req: SpeakRequest):
+def _validate(req: SpeakRequest) -> dict[str, float]:
     if req.engine not in ENGINES:
         raise HTTPException(status_code=400, detail="Bilinmeyen motor")
     if req.lang not in LANGUAGES:
         raise HTTPException(status_code=400, detail="Desteklenmeyen dil")
     if not split_text(req.text):
         raise HTTPException(status_code=400, detail="Metinde seslendirilecek içerik yok")
+    unknown = set(req.settings) - set(DEFAULT_SETTINGS)
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Bilinmeyen ayar: {', '.join(sorted(unknown))}")
+    settings = dict(DEFAULT_SETTINGS)
+    for key, value in req.settings.items():
+        low, high = SETTING_LIMITS[key]
+        if not low <= value <= high:
+            raise HTTPException(status_code=400, detail=f"{key} {low} ile {high} arasında olmalı")
+        settings[key] = value
+    return settings
 
 
 @app.get("/")
@@ -49,15 +60,17 @@ def list_engines():
         "device": DEVICE,
         "engines": list(ENGINES.keys()),
         "max_text_length": MAX_TEXT_LENGTH,
+        "default_settings": DEFAULT_SETTINGS,
+        "setting_limits": SETTING_LIMITS,
     }
 
 
 @app.post("/api/speak")
 def speak(req: SpeakRequest):
-    _validate(req)
+    settings = _validate(req)
     engine = ENGINES[req.engine]
     try:
-        out_path = render(engine, req.engine, req.lang, split_text(req.text))
+        out_path = render(engine, req.engine, req.lang, split_text(req.text), settings)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Ses üretilemedi: {exc}")
     return FileResponse(out_path, media_type="audio/wav", filename=out_path.name)
@@ -65,8 +78,8 @@ def speak(req: SpeakRequest):
 
 @app.post("/api/jobs", status_code=202)
 def start_job(req: SpeakRequest):
-    _validate(req)
-    job = create_job(ENGINES[req.engine], req.engine, req.lang, req.text)
+    settings = _validate(req)
+    job = create_job(ENGINES[req.engine], req.engine, req.lang, req.text, settings)
     return job.to_dict()
 
 

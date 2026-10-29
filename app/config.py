@@ -11,6 +11,22 @@ MAX_TEXT_LENGTH = 50000
 CHUNK_CHARS = 250
 PAUSE_SECONDS = 0.3
 
+DEFAULT_SETTINGS = {
+    "speed": 1.0,
+    "noise_scale": 0.667,
+    "noise_w_scale": 0.8,
+    "temperature": 0.75,
+    "top_p": 0.85,
+}
+
+SETTING_LIMITS = {
+    "speed": (0.5, 1.5),
+    "noise_scale": (0.0, 1.5),
+    "noise_w_scale": (0.0, 1.5),
+    "temperature": (0.1, 1.5),
+    "top_p": (0.1, 1.0),
+}
+
 # "auto": NVIDIA (CUDA) varsa onu kullan, yoksa CPU. Elle "cpu" veya "cuda" yazılabilir.
 DEVICE = "auto"
 

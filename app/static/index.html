@@ -169,6 +169,16 @@
     }
     .history-item:first-of-type { border-top: none; }
     .history-item .muted { color: var(--muted); font-size: 0.8rem; }
+    details.advanced { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
+    details.advanced summary { cursor: pointer; font-weight: 600; color: var(--muted); user-select: none; }
+    .setting { display: grid; grid-template-columns: 170px 1fr 60px; align-items: center; gap: 0.75rem; margin-top: 0.8rem; }
+    .setting label { font-size: 0.9rem; }
+    .setting small { display: block; color: var(--muted); font-size: 0.75rem; }
+    .setting output { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .engine-only { display: none; }
+    .engine-only.visible { display: grid; }
+    .advanced-actions { margin-top: 0.9rem; display: flex; justify-content: flex-end; }
   </style>
 </head>
 <body>
@@ -197,6 +207,38 @@
         <div class="spacer"></div>
         <button id="speak" class="primary">Üret</button>
       </div>
+
+      <details class="advanced">
+        <summary>Gelişmiş ayarlar</summary>
+        <div class="setting" data-setting="speed">
+          <label>Hız<small>0.5 yavaş, 1.5 hızlı</small></label>
+          <input type="range" id="speed" step="0.05">
+          <output id="speed-out"></output>
+        </div>
+        <div class="setting engine-only" data-engine="piper" data-setting="noise_scale">
+          <label>Değişkenlik<small>Piper: sesin doğallık çeşitliliği</small></label>
+          <input type="range" id="noise_scale" step="0.01">
+          <output id="noise_scale-out"></output>
+        </div>
+        <div class="setting engine-only" data-engine="piper" data-setting="noise_w_scale">
+          <label>Ritim değişkenliği<small>Piper: konuşma ritmi</small></label>
+          <input type="range" id="noise_w_scale" step="0.01">
+          <output id="noise_w_scale-out"></output>
+        </div>
+        <div class="setting engine-only" data-engine="xtts" data-setting="temperature">
+          <label>Yaratıcılık<small>XTTS: düşük tutarlı, yüksek değişken</small></label>
+          <input type="range" id="temperature" step="0.05">
+          <output id="temperature-out"></output>
+        </div>
+        <div class="setting engine-only" data-engine="xtts" data-setting="top_p">
+          <label>Çeşitlilik (top-p)<small>XTTS: örnekleme genişliği</small></label>
+          <input type="range" id="top_p" step="0.01">
+          <output id="top_p-out"></output>
+        </div>
+        <div class="advanced-actions">
+          <button id="reset-settings" class="ghost">Varsayılanlara dön</button>
+        </div>
+      </details>
     </section>
 
     <section id="status-card" class="card hidden">
@@ -239,7 +281,10 @@
     };
 
     let maxTextLength = 50000;
+    let defaultSettings = {};
+    let settingLimits = {};
     let languages = {};
+    const SETTING_KEYS = ["speed", "noise_scale", "noise_w_scale", "temperature", "top_p"];
     let activeJobId = null;
     let timer = null;
     const history = [];
@@ -272,8 +317,47 @@
         $("engine").add(new Option(name === "xtts" ? "XTTS v2 (doğal)" : "Piper (hızlı)", name));
       }
       maxTextLength = engines.max_text_length;
+      defaultSettings = engines.default_settings;
+      settingLimits = engines.setting_limits;
       $("device").textContent = `Cihaz: ${engines.device.toUpperCase()}`;
+      for (const key of SETTING_KEYS) {
+        const input = $(key);
+        const [low, high] = settingLimits[key];
+        input.min = low;
+        input.max = high;
+        input.addEventListener("input", () => syncSettingOutput(key));
+      }
+      resetSettings();
       updateCounter();
+      updateEngineFields();
+    }
+
+    function syncSettingOutput(key) {
+      $(`${key}-out`).textContent = Number($(key).value).toFixed(2);
+    }
+
+    function resetSettings() {
+      for (const key of SETTING_KEYS) {
+        $(key).value = defaultSettings[key];
+        syncSettingOutput(key);
+      }
+    }
+
+    function updateEngineFields() {
+      const engine = $("engine").value;
+      for (const row of document.querySelectorAll(".engine-only")) {
+        row.classList.toggle("visible", row.dataset.engine === engine);
+      }
+    }
+
+    function collectSettings() {
+      const engine = $("engine").value;
+      const settings = { speed: Number($("speed").value) };
+      const engineKeys = engine === "xtts" ? ["temperature", "top_p"] : ["noise_scale", "noise_w_scale"];
+      for (const key of engineKeys) {
+        settings[key] = Number($(key).value);
+      }
+      return settings;
     }
 
     function setPill(status) {
@@ -410,7 +494,12 @@
         const res = await fetch("/api/jobs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, lang: $("lang").value, engine: $("engine").value }),
+          body: JSON.stringify({
+            text,
+            lang: $("lang").value,
+            engine: $("engine").value,
+            settings: collectSettings(),
+          }),
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -426,6 +515,8 @@
     }
 
     $("speak").addEventListener("click", speak);
+    $("engine").addEventListener("change", updateEngineFields);
+    $("reset-settings").addEventListener("click", resetSettings);
     $("text").addEventListener("input", updateCounter);
     $("text").addEventListener("keydown", (e) => {
       if (e.ctrlKey && e.key === "Enter") speak();

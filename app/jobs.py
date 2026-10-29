@@ -52,12 +52,12 @@ class Job:
         }
 
 
-def render(engine, engine_name: str, lang: str, chunks: list[str], on_chunk=None) -> Path:
+def render(engine, engine_name: str, lang: str, chunks: list[str], settings: dict, on_chunk=None) -> Path:
     engine.load(lang)
     parts = []
     sample_rate = None
     for chunk in chunks:
-        samples, sample_rate = engine.synthesize(chunk, lang)
+        samples, sample_rate = engine.synthesize(chunk, lang, settings)
         parts.append(samples)
         if on_chunk:
             on_chunk()
@@ -68,7 +68,7 @@ def render(engine, engine_name: str, lang: str, chunks: list[str], on_chunk=None
     return write_wav(OUTPUTS_DIR / filename, audio, sample_rate)
 
 
-def create_job(engine, engine_name: str, lang: str, text: str) -> Job:
+def create_job(engine, engine_name: str, lang: str, text: str, settings: dict) -> Job:
     chunks = split_text(text)
     job = Job(
         id=uuid.uuid4().hex,
@@ -79,7 +79,7 @@ def create_job(engine, engine_name: str, lang: str, text: str) -> Job:
     )
     with _lock:
         _jobs[job.id] = job
-    _executor.submit(_run, job, engine, chunks)
+    _executor.submit(_run, job, engine, chunks, settings)
     return job
 
 
@@ -87,13 +87,13 @@ def _advance(job: Job) -> None:
     job.done += 1
 
 
-def _run(job: Job, engine, chunks: list[str]) -> None:
+def _run(job: Job, engine, chunks: list[str], settings: dict) -> None:
     job.started_at = time.time()
     try:
         job.status = "loading"
         engine.load(job.lang)
         job.status = "running"
-        job.output = render(engine, job.engine_name, job.lang, chunks, lambda: _advance(job))
+        job.output = render(engine, job.engine_name, job.lang, chunks, settings, lambda: _advance(job))
         job.status = "done"
     except Exception as exc:
         job.status = "error"

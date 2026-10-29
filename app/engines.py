@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
-from piper import PiperVoice
+from piper import PiperVoice, SynthesisConfig
 
 from app.config import DEVICE, LANGUAGES, MODELS_DIR, XTTS_MODEL_DIR, XTTS_SPEAKER
 
@@ -48,9 +48,14 @@ class PiperEngine:
     def load(self, lang: str) -> None:
         self._voice(lang)
 
-    def synthesize(self, text: str, lang: str) -> tuple[np.ndarray, int]:
+    def synthesize(self, text: str, lang: str, settings: dict) -> tuple[np.ndarray, int]:
         voice = self._voice(lang)
-        chunks = [chunk.audio_int16_array for chunk in voice.synthesize(text)]
+        syn_config = SynthesisConfig(
+            length_scale=1.0 / settings["speed"],
+            noise_scale=settings["noise_scale"],
+            noise_w_scale=settings["noise_w_scale"],
+        )
+        chunks = [chunk.audio_int16_array for chunk in voice.synthesize(text, syn_config)]
         samples = np.concatenate(chunks).astype(np.float32) / 32768.0
         return samples, voice.config.sample_rate
 
@@ -76,11 +81,14 @@ class XTTSEngine:
     def load(self, lang: str) -> None:
         self._model()
 
-    def synthesize(self, text: str, lang: str) -> tuple[np.ndarray, int]:
+    def synthesize(self, text: str, lang: str, settings: dict) -> tuple[np.ndarray, int]:
         tts = self._model()
         wav = tts.tts(
             text=text,
             speaker=XTTS_SPEAKER,
             language=LANGUAGES[lang]["xtts"],
+            speed=settings["speed"],
+            temperature=settings["temperature"],
+            top_p=settings["top_p"],
         )
         return np.asarray(wav, dtype=np.float32), tts.synthesizer.output_sample_rate
