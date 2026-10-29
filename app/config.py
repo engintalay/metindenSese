@@ -10,21 +10,28 @@ PORT = 10001
 # "auto": NVIDIA (CUDA) varsa onu kullan, yoksa CPU. Elle "cpu" veya "cuda" yazılabilir.
 DEVICE = "auto"
 
+XTTS_MODEL_DIR = MODELS_DIR / "xtts_v2"
+XTTS_SPEAKER = "Ana Florence"
+
 LANGUAGES = {
     "tr": {
         "name": "Türkçe",
         "piper": "tr_TR-dfki-medium.onnx",
+        "xtts": "tr",
     },
     "de": {
         "name": "Almanca",
         "piper": "de_DE-thorsten-medium.onnx",
+        "xtts": "de",
     },
     "es": {
         "name": "İspanyolca",
         "piper": "es_ES-davefx-medium.onnx",
+        "xtts": "es",
     },
     "en": {
         "name": "İngilizce",
         "piper": "en_US-lessac-medium.onnx",
+        "xtts": "en",
     },
 }

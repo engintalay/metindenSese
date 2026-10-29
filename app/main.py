@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.config import HOST, LANGUAGES, OUTPUTS_DIR, PORT, ROOT_DIR
-from app.engines import PiperEngine, detect_device
+from app.engines import PiperEngine, XTTSEngine, detect_device
 
 MAX_TEXT_LENGTH = 5000
 
@@ -18,6 +18,7 @@ app.mount("/static", StaticFiles(directory=ROOT_DIR / "app" / "static"), name="s
 DEVICE = detect_device()
 ENGINES = {
     "piper": PiperEngine(DEVICE),
+    "xtts": XTTSEngine(DEVICE),
 }
 
 
