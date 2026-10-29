@@ -21,6 +21,7 @@
   <h1>Metinden Sese</h1>
 
   <textarea id="text" placeholder="Seslendirmek istediğiniz metni yazın..."></textarea>
+  <div class="info" id="counter"></div>
 
   <div class="row">
     <label>Dil
@@ -42,6 +43,13 @@
 
   <script>
     const el = (id) => document.getElementById(id);
+    const MAX_TEXT_LENGTH = 5000;
+
+    function updateCounter() {
+      const length = el("text").value.length;
+      el("counter").textContent = `${length} / ${MAX_TEXT_LENGTH} karakter`;
+      el("counter").style.color = length > MAX_TEXT_LENGTH ? "#b00020" : "";
+    }
 
     async function loadOptions() {
       const [languages, engines] = await Promise.all([
@@ -64,6 +72,10 @@
         el("error").textContent = "Lütfen bir metin girin.";
         return;
       }
+      if (text.length > MAX_TEXT_LENGTH) {
+        el("error").textContent = `Metin en fazla ${MAX_TEXT_LENGTH} karakter olabilir (şu an ${text.length}).`;
+        return;
+      }
 
       const button = el("speak");
       button.disabled = true;
@@ -80,7 +92,8 @@
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(body.detail || `Hata: ${res.status}`);
+          const detail = typeof body.detail === "string" ? body.detail : "";
+          throw new Error(detail || `İstek hatası (${res.status}). Girdileri kontrol edin.`);
         }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -99,6 +112,8 @@
     }
 
     el("speak").addEventListener("click", speak);
+    el("text").addEventListener("input", updateCounter);
+    updateCounter();
     loadOptions().catch((err) => {
       el("error").textContent = "Sunucuya bağlanılamadı: " + err.message;
     });
