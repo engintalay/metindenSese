@@ -4,9 +4,104 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metinden Sese</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    h1 { font-size: 1.6rem; }
+    textarea { width: 100%; min-height: 180px; padding: 0.6rem; font: inherit; box-sizing: border-box; }
+    .row { display: flex; gap: 1rem; align-items: center; margin: 0.8rem 0; flex-wrap: wrap; }
+    select, button { font: inherit; padding: 0.4rem 0.8rem; }
+    button { cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    .info { color: #666; font-size: 0.9rem; }
+    .error { color: #b00020; min-height: 1.2rem; }
+    audio { width: 100%; margin-top: 0.8rem; }
+  </style>
 </head>
 <body>
   <h1>Metinden Sese</h1>
-  <p>Arayüz Aşama 4'te eklenecek.</p>
+
+  <textarea id="text" placeholder="Seslendirmek istediğiniz metni yazın..."></textarea>
+
+  <div class="row">
+    <label>Dil
+      <select id="lang"></select>
+    </label>
+    <label>Motor
+      <select id="engine"></select>
+    </label>
+    <button id="speak">Üret</button>
+  </div>
+
+  <div class="info" id="device"></div>
+  <div class="error" id="error"></div>
+
+  <audio id="player" controls></audio>
+  <div class="row">
+    <a id="download" hidden download>WAV indir</a>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+
+    async function loadOptions() {
+      const [languages, engines] = await Promise.all([
+        fetch("/api/languages").then((r) => r.json()),
+        fetch("/api/engines").then((r) => r.json()),
+      ]);
+      for (const l of languages) {
+        el("lang").add(new Option(l.name, l.code));
+      }
+      for (const name of engines.engines) {
+        el("engine").add(new Option(name, name));
+      }
+      el("device").textContent = `Çalışma cihazı: ${engines.device.toUpperCase()}`;
+    }
+
+    async function speak() {
+      const text = el("text").value.trim();
+      el("error").textContent = "";
+      if (!text) {
+        el("error").textContent = "Lütfen bir metin girin.";
+        return;
+      }
+
+      const button = el("speak");
+      button.disabled = true;
+      button.textContent = "Üretiliyor...";
+      try {
+        const res = await fetch("/api/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            lang: el("lang").value,
+            engine: el("engine").value,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.detail || `Hata: ${res.status}`);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        el("player").src = url;
+        el("player").play();
+        const link = el("download");
+        link.href = url;
+        link.download = "ses.wav";
+        link.hidden = false;
+      } catch (err) {
+        el("error").textContent = err.message;
+      } finally {
+        button.disabled = false;
+        button.textContent = "Üret";
+      }
+    }
+
+    el("speak").addEventListener("click", speak);
+    loadOptions().catch((err) => {
+      el("error").textContent = "Sunucuya bağlanılamadı: " + err.message;
+    });
+  </script>
 </body>
 </html>
